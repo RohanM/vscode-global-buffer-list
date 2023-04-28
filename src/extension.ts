@@ -1,26 +1,51 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+  // Store opened documents URIs
+  const openedDocuments: Set<string> = new Set();
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "global-buffer-list" is now active!');
+  // Open a file in all groups
+  async function openFileInAllGroups(uri: vscode.Uri) {
+    const document = await vscode.workspace.openTextDocument(uri);
+    const editorGroups = vscode.window.visibleTextEditors.map(editor => editor.viewColumn);
+    const uniqueGroups = Array.from(new Set(editorGroups));
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('global-buffer-list.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from Global buffer list!');
-	});
+    for (const group of uniqueGroups) {
+      await vscode.window.showTextDocument(document, { viewColumn: group, preview: false, preserveFocus: true });
+    }
 
-	context.subscriptions.push(disposable);
+    openedDocuments.add(uri.toString());
+  }
+
+  // Open all stored documents in the new group
+  async function openDocumentsInNewGroup(group: vscode.ViewColumn) {
+    for (const uriString of openedDocuments) {
+      const uri = vscode.Uri.parse(uriString);
+      const document = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(document, { viewColumn: group, preview: false, preserveFocus: true });
+    }
+  }
+
+  // Listen for file opening events
+  context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(async (document) => {
+    const uriString = document.uri.toString();
+    if (!openedDocuments.has(uriString)) {
+      await openFileInAllGroups(document.uri);
+    }
+  }));
+
+  // Listen for new group creation events
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+    if (editor && editor.viewColumn) {
+      const currentGroup = vscode.window.activeTextEditor?.viewColumn;
+      const otherGroups = vscode.window.visibleTextEditors.map(e => e.viewColumn).filter(group => group !== currentGroup);
+      const uniqueGroups = Array.from(new Set(otherGroups));
+
+      if (uniqueGroups.length > 0) {
+        await openDocumentsInNewGroup(editor.viewColumn);
+      }
+    }
+  }));
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
