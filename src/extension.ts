@@ -35,14 +35,14 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   // Listen for new group creation events
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {
-    if (editor && editor.viewColumn) {
-      const currentGroup = vscode.window.activeTextEditor?.viewColumn;
+  context.subscriptions.push(vscode.window.onDidChangeTextEditorViewColumn(async (event) => {
+    if (event.viewColumn) {
+      const currentGroup = event.viewColumn;
       const otherGroups = vscode.window.visibleTextEditors.map(e => e.viewColumn).filter(group => group !== currentGroup);
       const uniqueGroups = Array.from(new Set(otherGroups));
 
       if (uniqueGroups.length > 0) {
-        await openDocumentsInNewGroup(editor.viewColumn);
+        await openDocumentsInNewGroup(currentGroup);
       }
     }
   }));
